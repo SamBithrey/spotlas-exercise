@@ -113,6 +113,28 @@ func main() {
 			}
 
 		} else if p.Shape == "square" {
+			filter := fmt.Sprintf("coordinates && ST_Buffer('SRID=4326;POINT(%v %v)'::geography, %v, 'quad_segs=1')", lon, lat, p.Radius)
+			order := fmt.Sprintf("ST_Distance(coordinates, 'SRID=4326;POINT(%v %v)'::geography)", lon, lat)
+
+			sql, _, _ := psql.Select("*").From("\"MY_TABLE\"").Where(filter).OrderBy(order).ToSql()
+			var spot Spot
+			rows, err := conn.Query(sql)
+			if err != nil {
+				panic(err)
+			}
+
+			for rows.Next() {
+				spot.Id = ""
+				spot.Name = ""
+				spot.Website = ""
+				spot.Coordinates = ""
+				spot.Description = ""
+				spot.Rating = 0
+				if err := rows.Scan(&spot.Id, &spot.Name, &spot.Website, &spot.Coordinates, &spot.Description, &spot.Rating); err != nil {
+					log.Fatal(err)
+				}
+				spots = append(spots, spot)
+			}
 
 		} else {
 			return c.Status(404).JSON(`Error:Please input correct shape`)
