@@ -23,6 +23,7 @@ func main() {
 
 	app.Get(`/all`, handlers.ReturnAll)
 
+	// http://localhost:4000/distance?lat=51&lon=0.0&radius=1000&shape=circle
 	app.Get("/distance", handlers.ReturnSelection)
 
 	log.Fatal(app.Listen(":4000"))

@@ -54,7 +54,7 @@ func ReturnSelection(c *fiber.Ctx) error {
 
 	queries := c.Queries()
 	if queries["lon"] == "" || queries["lat"] == "" || queries["radius"] == "" {
-		return c.Status(400).SendString("Please input your queries")
+		return c.Status(500).SendString("Please input your queries")
 	}
 
 	type DistanceParams struct {
@@ -72,53 +72,39 @@ func ReturnSelection(c *fiber.Ctx) error {
 	}
 
 	result := Spots{}
+	var sql string
 
 	if p.Shape == "circle" {
 
 		filter := fmt.Sprintf("ST_DWithin(coordinates, 'SRID=4326;POINT(%v %v)'::geography, %v)", p.Lon, p.Lat, p.Radius)
 		order := fmt.Sprintf("ST_Distance(coordinates, 'SRID=4326;POINT(%v %v)'::geography)", p.Lon, p.Lat)
 
-		sql, _, _ := psql.Select("*").From("\"MY_TABLE\"").Where(filter).OrderBy(order).ToSql()
-
-		rows, err := db.Query(sql)
-		if err != nil {
-			return c.Status(500).SendString(err.Error())
-		}
-		defer rows.Close()
-
-		for rows.Next() {
-			spot := Spot{}
-			if err := rows.Scan(&spot.Id, &spot.Name, &spot.Website, &spot.Coordinates, &spot.Description, &spot.Rating); err != nil {
-				return err
-			}
-
-			result.Spots = append(result.Spots, spot)
-		}
+		sql, _, _ = psql.Select("*").From("\"MY_TABLE\"").Where(filter).OrderBy(order).ToSql()
 
 	} else if p.Shape == "square" {
 
 		filter := fmt.Sprintf("coordinates && ST_Buffer('SRID=4326;POINT(%v %v)'::geography, %v, 'quad_segs=1')", p.Lon, p.Lat, p.Radius)
 		order := fmt.Sprintf("ST_Distance(coordinates, 'SRID=4326;POINT(%v %v)'::geography)", p.Lon, p.Lat)
 
-		sql, _, _ := psql.Select("*").From("\"MY_TABLE\"").Where(filter).OrderBy(order).ToSql()
-
-		rows, err := db.Query(sql)
-		if err != nil {
-			return c.Status(500).SendString(err.Error())
-		}
-		defer rows.Close()
-
-		for rows.Next() {
-			spot := Spot{}
-			if err := rows.Scan(&spot.Id, &spot.Name, &spot.Website, &spot.Coordinates, &spot.Description, &spot.Rating); err != nil {
-				return err
-			}
-
-			result.Spots = append(result.Spots, spot)
-		}
+		sql, _, _ = psql.Select("*").From("\"MY_TABLE\"").Where(filter).OrderBy(order).ToSql()
 
 	} else {
 		return c.Status(500).JSON(`Error:Please input correct shape`)
+	}
+
+	rows, err := db.Query(sql)
+	if err != nil {
+		return c.Status(500).SendString(err.Error())
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		spot := Spot{}
+		if err := rows.Scan(&spot.Id, &spot.Name, &spot.Website, &spot.Coordinates, &spot.Description, &spot.Rating); err != nil {
+			return err
+		}
+
+		result.Spots = append(result.Spots, spot)
 	}
 
 	return c.JSON(result.Spots)
